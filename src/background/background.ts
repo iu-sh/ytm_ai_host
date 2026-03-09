@@ -153,6 +153,7 @@ chrome.runtime.onMessage.addListener(
       } = message.payload;
       // Pass currentTime here as well in case cache missed and we need it now
       const currentTime = new Date().toLocaleTimeString([], {
+        weekday: "long",
         hour: "2-digit",
         minute: "2-digit",
       });
