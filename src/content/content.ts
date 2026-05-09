@@ -370,6 +370,7 @@ function performPrefetch(
       newSongTitle: uSong.title,
       newArtist: uSong.artist,
       currentTime: new Date().toLocaleTimeString([], {
+        weekday: "long",
         hour: "2-digit",
         minute: "2-digit",
       }),
