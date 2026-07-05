@@ -62,7 +62,6 @@ export async function generateRJIntro(
       const modelProvider = settings.modelProvider || "gemini-api";
       const geminiApiKey = settings.geminiApiKey || "";
       const localServerPort = settings.localServerPort || 8008;
-      const cityName = settings.cityName || "";
 
       textToSpeak = await chrome.runtime.sendMessage({
         type: "GENERATE_RJ",
@@ -76,7 +75,7 @@ export async function generateRJIntro(
           geminiApiKey,
           localServerPort,
           currentTime,
-          cityName,
+          cityName: cityName || settings.cityName || "",
         },
       });
 
