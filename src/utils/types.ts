@@ -5,6 +5,7 @@ export interface StorageSchema {
   geminiApiKey?: string;
   speechProvider: "tts" | "localserver" | "gemini-api" | "kokoro";
   localServerPort: number;
+  cityName?: string;
 }
 
 export type MessageSchema =
@@ -30,6 +31,7 @@ export type MessageSchema =
         localServerPort?: number;
         systemPrompt?: string;
         currentTime?: string;
+        cityName?: string;
       };
     }
   | {
@@ -49,6 +51,7 @@ export type MessageSchema =
         modelProvider?: "gemini" | "gemini-api" | "webllm" | "localserver"; // Add this here too
         geminiApiKey?: string;
         currentTime?: string;
+        cityName?: string;
       };
     }
   | {
