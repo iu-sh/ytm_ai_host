@@ -18,6 +18,7 @@ export async function generateRJIntro(
   newSongTitle: string,
   newArtist: string,
   currentTime?: string,
+  cityName?: string,
   allowGeneration: boolean = true,
 ): Promise<string> {
   const key = getCacheKey(oldSongTitle, newSongTitle);
@@ -56,6 +57,7 @@ export async function generateRJIntro(
         "modelProvider",
         "geminiApiKey",
         "localServerPort",
+        "cityName",
       ]);
       const modelProvider = settings.modelProvider || "gemini-api";
       const geminiApiKey = settings.geminiApiKey || "";
@@ -73,6 +75,7 @@ export async function generateRJIntro(
           geminiApiKey,
           localServerPort,
           currentTime,
+          cityName: cityName || settings.cityName || "",
         },
       });
 
@@ -160,16 +163,21 @@ chrome.runtime.onMessage.addListener(
       // Immediately acknowledge message to prevent port collecting error on Content Script side
       sendResponse({ received: true });
 
-      announceSong(
-        sender.tab.id,
-        currentSongTitle,
-        currentSongArtist,
-        upcomingSongTitle,
-        upcomingSongArtist,
-        currentTime,
-      );
+      chrome.storage.sync.get(["cityName"], (settings) => {
+        if (sender.tab?.id) {
+          announceSong(
+            sender.tab.id,
+            currentSongTitle,
+            currentSongArtist,
+            upcomingSongTitle,
+            upcomingSongArtist,
+            currentTime,
+            settings.cityName
+          );
+        }
+      });
     } else if (message.type === "PREWARM_RJ") {
-      const { oldSongTitle, oldArtist, newSongTitle, newArtist, currentTime } =
+      const { oldSongTitle, oldArtist, newSongTitle, newArtist, currentTime, cityName } =
         message.payload;
       console.log(
         `[Pre-Warm] Received request for ${oldSongTitle} -> ${newSongTitle}`,
@@ -180,6 +188,7 @@ chrome.runtime.onMessage.addListener(
         newSongTitle,
         newArtist,
         currentTime,
+        cityName,
       );
     } else if (message.type === "OFFSCREEN_TO_CONTENT_PROXY") {
       const { tabId, message: nestedMessage } = message.payload;
@@ -208,6 +217,7 @@ function announceSong(
   upcomingSongTitle: string,
   upcomingSongArtist: string,
   currentTime: string,
+  cityName?: string,
 ) {
   if (alreadyAnnounced.has(`${currentSongTitle}:::${upcomingSongTitle}`)) {
     console.log(
@@ -223,6 +233,7 @@ function announceSong(
     upcomingSongTitle,
     upcomingSongArtist,
     currentTime,
+    cityName,
     false,
   ).then(async (response: string) => {
     console.log("Generated Intro:", response);

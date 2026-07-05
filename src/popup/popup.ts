@@ -8,19 +8,21 @@ const localServerConfig = document.getElementById('localServerConfig') as HTMLEl
 const geminiApiConfig = document.getElementById('geminiApiConfig') as HTMLElement;
 const geminiApiKeyInput = document.getElementById('geminiApiKeyInput') as HTMLInputElement;
 const portInput = document.getElementById('portInput') as HTMLInputElement;
+const cityNameInput = document.getElementById('cityNameInput') as HTMLInputElement;
 const testConnectionBtn = document.getElementById('testConnectionBtn') as HTMLButtonElement;
 const connectionStatus = document.getElementById('connectionStatus') as HTMLElement;
 const statusText = document.getElementById('statusText') as HTMLElement;
 
 
 // Initialize state
-chrome.storage.sync.get(['isEnabled', 'isDebugEnabled', 'modelProvider', 'speechProvider', 'localServerPort', 'geminiApiKey'], (result: Partial<StorageSchema>) => {
+chrome.storage.sync.get(['isEnabled', 'isDebugEnabled', 'modelProvider', 'speechProvider', 'localServerPort', 'geminiApiKey', 'cityName'], (result: Partial<StorageSchema>) => {
     const isEnabled = result.isEnabled ?? true;
     const isDebugEnabled = result.isDebugEnabled ?? false;
     const modelProvider = result.modelProvider || 'gemini-api';
     const speechProvider = result.speechProvider || 'tts';
     const localServerPort = result.localServerPort || 8008;
     const geminiApiKey = result.geminiApiKey || '';
+    const cityName = result.cityName || '';
 
     updateUI(isEnabled, isDebugEnabled);
     
@@ -29,6 +31,7 @@ chrome.storage.sync.get(['isEnabled', 'isDebugEnabled', 'modelProvider', 'speech
     speechSelect.value = speechProvider;
     portInput.value = localServerPort.toString();
     geminiApiKeyInput.value = geminiApiKey;
+    cityNameInput.value = cityName;
 
     updateVisibility();
 });
@@ -69,6 +72,11 @@ portInput.addEventListener('change', () => {
 geminiApiKeyInput.addEventListener('change', () => {
     const geminiApiKey = geminiApiKeyInput.value;
     chrome.storage.sync.set({ geminiApiKey });
+});
+
+cityNameInput.addEventListener('change', () => {
+    const cityName = cityNameInput.value;
+    chrome.storage.sync.set({ cityName });
 });
 
 testConnectionBtn.addEventListener('click', async () => {

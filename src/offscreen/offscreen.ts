@@ -239,6 +239,7 @@ async function generateWithGeminiAPI(data: {
   newArtist: string;
   geminiApiKey?: string;
   currentTime?: string;
+  cityName?: string;
 }): Promise<string> {
   const apiKey = data.geminiApiKey;
   if (!apiKey) {
@@ -249,17 +250,41 @@ async function generateWithGeminiAPI(data: {
   const timeContext = data.currentTime
     ? ` Current time: ${data.currentTime}.`
     : "";
-  // Random 1/3 chance to add witty fact
-  const aRandomNumber = Math.random();
-  const addWittyFact = Math.floor(aRandomNumber * 3) + 1 === 3;
-  const addWeatherInfo = Math.floor(aRandomNumber * 5) + 1 === 5; // 1/5 chance to add weather info
-  const addNewsInfo = Math.floor(aRandomNumber * 10) + 1 === 10; // 1/10 chance to add news info
+  // Random chances
+  const addWittyFact = Math.random() < 1/3;
+  const addWeatherInfo = Math.random() < 1/8; // 1/8 chance to add weather info
+  const addNewsInfo = Math.random() < 1/10; // 1/10 chance to add news info
 
-  const extraInstruction = addWittyFact
-    ? "Maybe provide a witty random fact."
+  let extraInstruction = addWittyFact
+    ? "Maybe provide a witty random fact. "
     : "";
+  if (addWeatherInfo && data.cityName) {
+    extraInstruction += `Also briefly mention the current weather in ${data.cityName}. `;
+  }
+  if (addNewsInfo) {
+    extraInstruction += "Also briefly mention one piece of current international news. ";
+  }
 
-  const prompt = `Previous Song: "${data.oldSongTitle}" by "${data.oldArtist}"\nNext Song: "${data.newSongTitle}" by "${data.newArtist}"\n${timeContext}\n\nGenerate the DJ intro now.${extraInstruction}`;
+  const prompt = `Previous Song: "${data.oldSongTitle}" by "${data.oldArtist}"\nNext Song: "${data.newSongTitle}" by "${data.newArtist}"\n${timeContext}\n\nGenerate the DJ intro now. ${extraInstruction}`;
+
+  const requestBody: any = {
+    system_instruction: {
+      parts: [{ text: RJ_SYSTEM_PROMPT }],
+    },
+    contents: [
+      {
+        parts: [
+          {
+            text: prompt,
+          },
+        ],
+      },
+    ],
+  };
+
+  if (addWeatherInfo || addNewsInfo) {
+    requestBody.tools = [{ googleSearch: {} }];
+  }
 
   try {
     const response = await fetch(
@@ -269,20 +294,7 @@ async function generateWithGeminiAPI(data: {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          system_instruction: {
-            parts: [{ text: RJ_SYSTEM_PROMPT }],
-          },
-          contents: [
-            {
-              parts: [
-                {
-                  text: prompt,
-                },
-              ],
-            },
-          ],
-        }),
+        body: JSON.stringify(requestBody),
       },
     );
 
