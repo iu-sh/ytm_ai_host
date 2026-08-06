@@ -4,6 +4,7 @@ const toggle = document.getElementById('enableToggle') as HTMLInputElement;
 const debugToggle = document.getElementById('debugToggle') as HTMLInputElement;
 const modelSelect = document.getElementById('modelSelect') as HTMLSelectElement;
 const speechSelect = document.getElementById('speechSelect') as HTMLSelectElement;
+const djModeSelect = document.getElementById('djModeSelect') as HTMLSelectElement;
 const localServerConfig = document.getElementById('localServerConfig') as HTMLElement;
 const geminiApiConfig = document.getElementById('geminiApiConfig') as HTMLElement;
 const geminiApiKeyInput = document.getElementById('geminiApiKeyInput') as HTMLInputElement;
@@ -14,19 +15,21 @@ const statusText = document.getElementById('statusText') as HTMLElement;
 
 
 // Initialize state
-chrome.storage.sync.get(['isEnabled', 'isDebugEnabled', 'modelProvider', 'speechProvider', 'localServerPort', 'geminiApiKey'], (result: Partial<StorageSchema>) => {
+chrome.storage.sync.get(['isEnabled', 'isDebugEnabled', 'modelProvider', 'speechProvider', 'localServerPort', 'geminiApiKey', 'djMode'], (result: Partial<StorageSchema>) => {
     const isEnabled = result.isEnabled ?? true;
     const isDebugEnabled = result.isDebugEnabled ?? false;
     const modelProvider = result.modelProvider || 'gemini-api';
     const speechProvider = result.speechProvider || 'tts';
     const localServerPort = result.localServerPort || 8008;
     const geminiApiKey = result.geminiApiKey || '';
+    const djMode = result.djMode || 'radio';
 
     updateUI(isEnabled, isDebugEnabled);
-    
+
     // Set values
     modelSelect.value = modelProvider;
     speechSelect.value = speechProvider;
+    djModeSelect.value = djMode;
     portInput.value = localServerPort.toString();
     geminiApiKeyInput.value = geminiApiKey;
 
@@ -59,10 +62,15 @@ speechSelect.addEventListener('change', () => {
     });
 });
 
+djModeSelect.addEventListener('change', () => {
+    const djMode = djModeSelect.value as any;
+    chrome.storage.sync.set({ djMode });
+});
+
 portInput.addEventListener('change', () => {
     const localServerPort = parseInt(portInput.value);
     if (!isNaN(localServerPort)) {
-       chrome.storage.sync.set({ localServerPort });
+        chrome.storage.sync.set({ localServerPort });
     }
 });
 
@@ -75,7 +83,7 @@ testConnectionBtn.addEventListener('click', async () => {
     const port = portInput.value;
     connectionStatus.textContent = "Testing...";
     connectionStatus.className = "status-msg";
-    
+
     try {
         const response = await fetch(`http://localhost:${port}/health`);
         if (response.ok) {

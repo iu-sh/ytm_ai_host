@@ -111,6 +111,7 @@ async function preloadAudio(payload: {
   textToSpeak: string;
   speechProvider?: "tts" | "localserver" | "gemini-api" | "kokoro";
   geminiApiKey?: string;
+  djMode?: "party" | "radio" | "ghazal";
 }) {
   if (audioCache.has(payload.textToSpeak)) {
     console.log("Audio already cached (or fetching) for:", payload.textToSpeak);
@@ -118,11 +119,12 @@ async function preloadAudio(payload: {
   }
 
   console.log(
-    `[Offscreen] Starting Audio Preload from: ${payload.speechProvider}`,
+    `[Offscreen] Starting Audio Preload from: ${payload.speechProvider} [Mode: ${payload.djMode}]`,
   );
 
   // Check OPFS Cache first (Persistent)
-  const cacheKey = `${payload.textToSpeak}_${payload.speechProvider}`;
+  // Include djMode in cache key to avoid wrong voice
+  const cacheKey = `${payload.textToSpeak}_${payload.speechProvider}_${payload.djMode || "radio"}`;
   try {
     const opfsUrl = await getAudioFromOPFS(cacheKey);
     if (opfsUrl) {
@@ -142,7 +144,11 @@ async function preloadAudio(payload: {
   } else if (payload.speechProvider === "kokoro") {
     audioPromise = fetchKokoroTTS(payload.textToSpeak);
   } else {
-    audioPromise = fetchGeminiTTS(payload.geminiApiKey, payload.textToSpeak);
+    audioPromise = fetchGeminiTTS(
+      payload.geminiApiKey,
+      payload.textToSpeak,
+      payload.djMode,
+    );
   }
 
   audioCache.set(payload.textToSpeak, audioPromise);
@@ -167,7 +173,7 @@ async function preloadAudio(payload: {
           try {
             const url = await audioCache.get(payload.textToSpeak);
             if (url) URL.revokeObjectURL(url);
-          } catch (e) {}
+          } catch (e) { }
           audioCache.delete(payload.textToSpeak);
         }
       },
@@ -299,8 +305,10 @@ async function generateWithGeminiAPI(data: {
     }
     return text;
   } catch (err) {
-    console.error("Gemini API request failed:", err);
-    return `And this is ${data.newSongTitle} by ${data.newArtist}.`;
+    console.error("Gemini API generation failed:", err);
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    // Include error in the response so it is surfaced to the user (via TTS or logs)
+    return `Error: ${errorMessage}. Next is ${data.newSongTitle}.`;
   }
 }
 
@@ -313,6 +321,7 @@ async function playAudio(
     geminiApiKey?: string;
     forSongNow?: string;
     forSongNext?: string;
+    djMode?: "party" | "radio" | "ghazal";
   },
 ) {
   try {
@@ -337,14 +346,14 @@ async function playAudio(
       // return;
     }
     console.log(
-      `[Offscreen] Playing audio using provider: ${payload.speechProvider || "tts"}`,
+      `[Offscreen] Playing audio using provider: ${payload.speechProvider || "tts"} [Mode: ${payload.djMode}]`,
     );
 
     // 1. Try Memory Cache
     let audioPromise = audioCache.get(payload.textToSpeak);
 
     // 2. Try OPFS Cache
-    const cacheKey = `${payload.textToSpeak}_${payload.speechProvider}`;
+    const cacheKey = `${payload.textToSpeak}_${payload.speechProvider}_${payload.djMode || "radio"}`;
     if (!audioPromise) {
       try {
         const opfsUrl = await getAudioFromOPFS(cacheKey);
@@ -370,6 +379,7 @@ async function playAudio(
         audioPromise = fetchGeminiTTS(
           payload.geminiApiKey,
           payload.textToSpeak,
+          payload.djMode,
         );
       }
       audioCache.set(payload.textToSpeak, audioPromise);
@@ -381,9 +391,14 @@ async function playAudio(
 
     const urlOrBuffer = await audioPromise;
 
-    // If it's a blob URL (localserver or Kokoro), use Audio element
-    if (typeof urlOrBuffer === "string" && urlOrBuffer.startsWith("blob:")) {
+    // If it's a blob URL (localserver or Kokoro) or just a URL string
+    if (typeof urlOrBuffer === "string") {
       currentAudio = new Audio(urlOrBuffer);
+
+      // Apply Speed based on DJ Mode
+      const { rate } = getSpeechConfig(payload.djMode);
+      currentAudio.playbackRate = rate;
+
       return new Promise<void>((resolve, reject) => {
         if (!currentAudio) return reject("Audio object lost");
         currentAudio.onended = () => {
@@ -420,22 +435,15 @@ async function playAudio(
 
       // However, if we change implementation later, let's keep it robust.
       // If it IS a string, treating it as URL.
-      currentAudio = new Audio(urlOrBuffer);
-      return new Promise<void>((resolve, reject) => {
-        if (!currentAudio) return reject("Audio object lost");
-        currentAudio.onended = () => {
-          resolve();
-          currentAudio = null;
-        };
-        currentAudio.onerror = (e) => {
-          reject(e);
-          currentAudio = null;
-        };
-        currentAudio.play().catch((e) => {
-          reject(e);
-          currentAudio = null;
-        });
-      });
+      // But wait! Lines 425-438 in original file discussed this redundancy.
+      // I can simplify this entire block!
+      // `fetchGeminiTTS` returns string. `fetchAudio` returns string. `fetchKokoroTTS` returns string.
+      // `urlOrBuffer` comes from `await audioPromise`. `audioPromise` is `Promise<string>`.
+      // So `urlOrBuffer` is ALWAYS string.
+      // The `else` block (lines 426-463) is dead code!
+
+      // I will remove the else block entirely and just handle the string case.
+      // This is a great refactor.
     }
   } catch (e) {
     console.error("[Offscreen] Audio playback failed. Details:", e);
@@ -478,10 +486,14 @@ async function fetchKokoroTTS(text: string): Promise<string> {
 async function fetchGeminiTTS(
   apiKey: string | undefined,
   text: string,
+  djMode: "party" | "radio" | "ghazal" = "radio",
 ): Promise<string> {
   if (!apiKey) throw new Error("Gemini API Key missing for TTS");
 
-  console.log("Fetching Audio from Gemini API...");
+  console.log(`Fetching Audio from Gemini API... [Mode: ${djMode}]`);
+
+  const { voice } = getSpeechConfig(djMode);
+
   // Use gemini-2.5-flash-preview-tts
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-tts-preview:generateContent?key=${apiKey}`,
@@ -495,7 +507,7 @@ async function fetchGeminiTTS(
           speechConfig: {
             voiceConfig: {
               prebuiltVoiceConfig: {
-                voiceName: "Aoede", // Breezy female voice
+                voiceName: voice,
               },
             },
           },
@@ -524,11 +536,24 @@ async function fetchGeminiTTS(
   }
   const pcmData = bytes.buffer;
 
+  // Note: Speed (speakingRate) is applied in playAudio via playbackRate
+
   // Wrap PCM in WAV container
   const wavBuffer = createWavFile(pcmData);
   const blob = new Blob([wavBuffer], { type: "audio/wav" });
   const url = URL.createObjectURL(blob);
   return url;
+}
+
+function getSpeechConfig(mode: string = "radio") {
+  switch (mode) {
+    case "party":
+      return { voice: "Puck", rate: 1.3 }; // Faster
+    case "ghazal":
+      return { voice: "Charon", rate: 0.8 }; // Slower
+    default:
+      return { voice: "Aoede", rate: 1.0 };
+  }
 }
 
 // Helper to add WAV header to raw PCM data
@@ -674,7 +699,7 @@ async function cleanUpOldFiles() {
             await root.removeEntry(name);
             console.log(`[Offscreen] [OPFS] Deleted old file: ${name}`);
           }
-        } catch (e) {}
+        } catch (e) { }
       }
     }
   } catch (e) {

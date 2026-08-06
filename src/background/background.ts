@@ -103,10 +103,12 @@ export async function generateRJIntro(
       "speechProvider",
       "localServerPort",
       "geminiApiKey",
+      "djMode",
     ]);
     const speechProvider = settings.speechProvider || "gemini-api";
     const localServerPort = settings.localServerPort || 8008;
     const geminiApiKey = settings.geminiApiKey || "";
+    const djMode = settings.djMode || "radio";
 
     if (
       speechProvider === "localserver" ||
@@ -114,7 +116,7 @@ export async function generateRJIntro(
       speechProvider === "kokoro"
     ) {
       console.log(
-        `[Preload] Triggering Audio Preload for: ${speechProvider} (Generated: ${didGenerate})`,
+        `[Preload] Triggering Audio Preload for: ${speechProvider} (Generated: ${didGenerate}) [Mode: ${djMode}]`,
       );
 
       // Ensure offscreen exists (might be needed if cache hit but offscreen died)
@@ -134,6 +136,7 @@ export async function generateRJIntro(
           textToSpeak: textToSpeak,
           speechProvider,
           geminiApiKey,
+          djMode,
         },
       });
     }
@@ -240,13 +243,15 @@ function announceSong(
       "speechProvider",
       "localServerPort",
       "geminiApiKey",
+      "djMode",
     ]);
     const speechProvider = settings.speechProvider || "gemini-api";
     const localServerPort = settings.localServerPort || 8008;
     const geminiApiKey = settings.geminiApiKey || "";
+    const djMode = settings.djMode || "radio";
 
     console.log(
-      `[Announce] Speech Provider: ${speechProvider}, Local Port: ${localServerPort}`,
+      `[Announce] Speech Provider: ${speechProvider}, Local Port: ${localServerPort}, Mode: ${djMode}`,
     );
 
     if (
@@ -277,6 +282,7 @@ function announceSong(
             // Validate against the New Song (which is now playing/paused in the player)
             forSongNow: upcomingSongTitle,
             forSongNext: upcomingSongTitle, // Logic check: we usually just check "Is valid song loaded?". checking Next is tricky if queue updates. Let's just validate Now.
+            djMode,
           },
         });
 
